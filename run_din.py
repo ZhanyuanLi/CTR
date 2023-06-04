@@ -1,3 +1,4 @@
+# coding=utf-8
 import sys
 
 sys.path.insert(0, '..')
@@ -10,16 +11,15 @@ from deepctr_torch.models.din import DIN
 
 
 def get_xy_fd():
-    # ——*——*——*——*——*——*——*——*——*—— 初始化虚拟数据 ——*——*——*——*——*——*——*——*——*——
-    # 类别特征嵌入
+    # ——*——*——*——*——*——*——*——*——*—— 特征嵌入 ——*——*——*——*——*——*——*——*——*——
     feature_columns = [SparseFeat('user', 3, embedding_dim=8), SparseFeat('gender', 2, embedding_dim=8),
                        SparseFeat('item', 3 + 1, embedding_dim=8), SparseFeat('item_gender', 2 + 1, embedding_dim=8),
-                       DenseFeat('score', 1)]
+                       DenseFeat('score', 1)]  # 类别特征嵌入
 
-    # 可变长的类型特征——历史序列数据
     feature_columns += [VarLenSparseFeat(SparseFeat('hist_item', 3 + 1, embedding_dim=8), 4, length_name="seq_length"),
-                        VarLenSparseFeat(SparseFeat('hist_item_gender', 2 + 1, embedding_dim=8), 4, length_name="seq_length")]
-
+                        VarLenSparseFeat(SparseFeat('hist_item_gender', 2 + 1, embedding_dim=8), 4,
+                                         length_name="seq_length")]  # 可变长的类型特征——历史序列数据
+    # ——*——*——*——*——*——*——*——*——*—— 初始化虚拟数据 ——*——*——*——*——*——*——*——*——*——
     behavior_feature_list = ["item", "item_gender"]  # 可变长的类别特征列表
     uid = np.array([0, 1, 2])  # 用户id
     ugender = np.array([0, 1, 0])  # 用户性别特征
@@ -34,8 +34,10 @@ def get_xy_fd():
     feature_dict = {'user': uid, 'gender': ugender, 'item': iid, 'item_gender': igender,
                     'hist_item': hist_iid, 'hist_item_gender': hist_igender, 'score': score,
                     "seq_length": behavior_length}  # 构造特征字典
+
+    # 构造输入（x，y）
     x = {name: feature_dict[name] for name in get_feature_names(feature_columns)}
-    y = np.array([1, 0, 1])
+    y = np.array([1, 0, 1])  # 1: 正样本, 0: 负样本
 
     return x, y, feature_columns, behavior_feature_list
 
@@ -44,7 +46,7 @@ if __name__ == "__main__":
     x, y, feature_columns, behavior_feature_list = get_xy_fd()
     device = 'cpu'
     use_cuda = True
-    if use_cuda and torch.cuda.is_available():
+    if use_cuda and torch.cuda.is_available():  # pytorch-gpu
         print('cuda ready...')
         device = 'cuda:0'
 
