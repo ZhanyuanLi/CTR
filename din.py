@@ -40,7 +40,7 @@ class DIN(BaseModel):
                  att_activation='Dice', att_weight_normalization=False, l2_reg_dnn=0.0,
                  l2_reg_embedding=1e-6, dnn_dropout=0, init_std=0.0001,
                  seed=1024, task='binary', device='cpu', gpus=None):
-        # dnn_feature_columns：包含所有特征的可迭代对象 | history_feature_list：过去的序列稀疏文件 | dnn_use_bn：激活层前是否使用BN层
+        # dnn_feature_columns：包含所有特征的可迭代对象 | history_feature_list：指示序列稀疏字段 | dnn_use_bn：激活层前是否使用BN层
         # dnn_hidden_units：正整数列表或空列表，深度网每层的层数和单元数 | dnn_activation：注意力网络中使用的激活函数 | att_hidden_size：正整数列表，每层注意力网的层数和单元数
         # att_activation：注意力网络中使用的激活函数 | att_weight_normalization：是否对局部激活单元的注意力得分进行归一化 | l2_reg_dnn：应用于DNN的L2正则化子强度
         # l2_reg_embedding：应用于embedding向量的L2正则化子强度 | dnn_dropout：将放弃给定DNN坐标的概率 | init_std：用作embedding向量的初始化std
@@ -49,16 +49,18 @@ class DIN(BaseModel):
         super(DIN, self).__init__([], dnn_feature_columns, l2_reg_linear=0, l2_reg_embedding=l2_reg_embedding,
                                   init_std=init_std, seed=seed, task=task, device=device, gpus=gpus)
 
+        # fileter(函数，可迭代对象): 函数返回False时可迭代对象中对应值被删除，最终生成一个新的迭代器。list()将其转为列表返回
         self.sparse_feature_columns = list(
-            filter(lambda x: isinstance(x, SparseFeat), dnn_feature_columns)) if dnn_feature_columns else []
+            filter(lambda x: isinstance(x, SparseFeat), dnn_feature_columns)) if dnn_feature_columns else []  # 返回SparseFeat类型，用于存放'类别特征'
         self.varlen_sparse_feature_columns = list(
-            filter(lambda x: isinstance(x, VarLenSparseFeat), dnn_feature_columns)) if dnn_feature_columns else []
+            filter(lambda x: isinstance(x, VarLenSparseFeat), dnn_feature_columns)) if dnn_feature_columns else []  # 返回VarLenSparseFeat类型，用于存放'历史序列数据'
 
-        self.history_feature_list = history_feature_list
+        self.history_feature_list = history_feature_list  # # 可变长的'类别特征'列表，如：'商品id'和'商品类别'
 
-        self.history_feature_columns = []
-        self.sparse_varlen_feature_columns = []
-        self.history_fc_names = list(map(lambda x: "hist_" + x, history_feature_list))
+        self.history_feature_columns = []  # 可变长的历史序列数据
+        self.sparse_varlen_feature_columns = []  # ？？？？？？？？？？？？
+        # map(函数，可迭代对象)：对指定序列做映射，返回一个迭代器
+        self.history_fc_names = list(map(lambda x: "hist_" + x, history_feature_list))  # 如：'item' --> 'hist_item'
 
         for fc in self.varlen_sparse_feature_columns:
             feature_name = fc.name
@@ -67,14 +69,14 @@ class DIN(BaseModel):
             else:
                 self.sparse_varlen_feature_columns.append(fc)
 
-        att_emb_dim = self._compute_interest_dim()
+        att_emb_dim = self._compute_interest_dim()  # 可变长的历史特征的嵌入向量维度的和
 
-        self.attention = AttentionSequencePoolingLayer(att_hidden_units=att_hidden_size,
+        self.attention = AttentionSequencePoolingLayer(att_hidden_units=att_hidden_size,  # 正整数列表，每层注意力网的层数和单元数
                                                        embedding_dim=att_emb_dim,
-                                                       att_activation=att_activation,
+                                                       att_activation=att_activation,  # 注意力网络中使用的激活函数，Dice
                                                        return_score=False,
                                                        supports_masking=False,
-                                                       weight_normalization=att_weight_normalization)
+                                                       weight_normalization=att_weight_normalization)  # 是否对局部激活单元的注意力得分进行归一化，True
 
         self.dnn = DNN(inputs_dim=self.compute_input_dim(dnn_feature_columns),
                        hidden_units=dnn_hidden_units,
@@ -131,8 +133,8 @@ class DIN(BaseModel):
     def _compute_interest_dim(self):
         interest_dim = 0
         for feat in self.sparse_feature_columns:
-            if feat.name in self.history_feature_list:
-                interest_dim += feat.embedding_dim
+            if feat.name in self.history_feature_list:  # 可变长的历史特征
+                interest_dim += feat.embedding_dim  # 嵌入向量的维度的和
         return interest_dim
 
 
